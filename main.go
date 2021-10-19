@@ -73,8 +73,13 @@ func main() {
 
 	if err := runtime.RunLoop([]subscription.ISubscription{
 		&subscription.PodSubscription{
-			ClientSet: defaultKubernetesClientSet,
-			Ctx: context,
+			ClientSet:  defaultKubernetesClientSet,
+			Ctx:        context,
+			Completion: make(chan bool),
+		},
+		&subscription.ConfigMapSubscription{
+			ClientSet:  defaultKubernetesClientSet,
+			Ctx:        context,
 			Completion: make(chan bool),
 		},
 	}); err != nil {

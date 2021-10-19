@@ -12,12 +12,12 @@ import (
 
 type PodSubscription struct {
 	watcherInterface watch.Interface
-	ClientSet kubernetes.Interface
-	Ctx context.Context
-	Completion chan bool
+	ClientSet        kubernetes.Interface
+	Ctx              context.Context
+	Completion       chan bool
 }
 
-func(p *PodSubscription) Reconcile(object runtime.Object, event watch.EventType) {
+func (p *PodSubscription) Reconcile(object runtime.Object, event watch.EventType) {
 
 	pod := object.(*v1.Pod)
 	klog.Infof("PodSubscription event type %s for %s", event, pod.Name)
@@ -26,9 +26,12 @@ func(p *PodSubscription) Reconcile(object runtime.Object, event watch.EventType)
 	case watch.Added:
 		if _, ok := pod.Annotations["type"]; !ok {
 			updatedPod := pod.DeepCopy()
+			if updatedPod.Annotations == nil {
+				updatedPod.Annotations = make(map[string]string)
+			}
 			updatedPod.Annotations["type"] = "sre"
 			// Update the pod
-			_, err := p.ClientSet.CoreV1().Pods(pod.Namespace).Update(p.Ctx,updatedPod, metav1.UpdateOptions{})
+			_, err := p.ClientSet.CoreV1().Pods(pod.Namespace).Update(p.Ctx, updatedPod, metav1.UpdateOptions{})
 			if err != nil {
 				klog.Error(err)
 			}
@@ -51,7 +54,7 @@ func (p *PodSubscription) Subscribe() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	klog.Info("Started watch stream for PodSubscription")
 	return p.watcherInterface, nil
 }
 

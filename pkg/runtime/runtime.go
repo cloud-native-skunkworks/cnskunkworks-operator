@@ -2,38 +2,27 @@ package runtime
 
 import (
 	"github.com/cloud-native-skunkworks/cnskunkworks-operator/pkg/subscription"
+	"sync"
 )
 
-func RunLoop(subscriptions []subscription.ISubscription) error{
+func RunLoop(subscriptions []subscription.ISubscription) error {
 
-
-	for _, subscription := range subscriptions {
-
-		wiface, err := subscription.Subscribe()
-		if err != nil {
-			return err
-		}
-
-		go func() {
-
+	var wg sync.WaitGroup
+	for _, sub := range subscriptions {
+		wg.Add(1)
+		go func(subscription subscription.ISubscription) error {
+			wiface, err := subscription.Subscribe()
+			if err != nil {
+				return err
+			}
 			for {
 				select {
-					case msg := <- wiface.ResultChan():
-						subscription.Reconcile(msg.Object,msg.Type)
-					// TODO: Do we want a way of escaping from our go rountines?
+				case msg := <-wiface.ResultChan():
+					subscription.Reconcile(msg.Object, msg.Type)
 				}
 			}
-
-		}() // Could signal handler into them??
+		}(sub)
 	}
-
-	for _, subscription := range subscriptions {
-
-
-		select {
-			case  _ = <- subscription.IsComplete():
-				break
-		}
-	}
+	wg.Wait()
 	return nil
 }
