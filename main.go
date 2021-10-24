@@ -71,17 +71,21 @@ func main() {
 	// Context
 	context := context.TODO()
 
+	configMapSubscription := &subscription.ConfigMapSubscription{
+		ClientSet:  defaultKubernetesClientSet,
+		Ctx:        context,
+		Completion: make(chan bool),
+	}
+	podSubscription := &subscription.PodSubscription{
+		ClientSet:             defaultKubernetesClientSet,
+		Ctx:                   context,
+		Completion:            make(chan bool),
+		ConfigMapSubscriptRef: configMapSubscription,
+	}
+
 	if err := runtime.RunLoop([]subscription.ISubscription{
-		&subscription.PodSubscription{
-			ClientSet:  defaultKubernetesClientSet,
-			Ctx:        context,
-			Completion: make(chan bool),
-		},
-		&subscription.ConfigMapSubscription{
-			ClientSet:  defaultKubernetesClientSet,
-			Ctx:        context,
-			Completion: make(chan bool),
-		},
+		configMapSubscription,
+		podSubscription,
 	}); err != nil {
 		klog.Fatalf(err.Error())
 	}

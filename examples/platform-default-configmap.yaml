@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-default-configmap
+  namespace: kube-system
+data:
+  platform-defaults: |
+    annotations:
+    - name: sre
+      value: type
+    - name: owner
+      value: cnskunkworks

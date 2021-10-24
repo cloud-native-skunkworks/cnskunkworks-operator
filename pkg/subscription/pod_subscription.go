@@ -15,8 +15,30 @@ type PodSubscription struct {
 	ClientSet        kubernetes.Interface
 	Ctx              context.Context
 	Completion       chan bool
+	// This specific reference to ConfigMapSubscription is for updating pod annotations
+	ConfigMapSubscriptRef *ConfigMapSubscription
 }
 
+func (p *PodSubscription) applyConfigMapChanges(pod *v1.Pod, event watch.EventType) {
+
+	if p.ConfigMapSubscriptRef != nil {
+		if p.ConfigMapSubscriptRef.PlatformConfig != nil {
+			updatedPod := pod.DeepCopy()
+			if updatedPod.Annotations == nil {
+				updatedPod.Annotations = make(map[string]string)
+			}
+			// Loop through and apply
+			for _, annotation := range p.ConfigMapSubscriptRef.PlatformConfig.Annotations {
+				updatedPod.Annotations[annotation.Name] = annotation.Value
+			}
+			// Update the pod
+			_, err := p.ClientSet.CoreV1().Pods(pod.Namespace).Update(p.Ctx, updatedPod, metav1.UpdateOptions{})
+			if err != nil {
+				klog.Error(err)
+			}
+		}
+	}
+}
 func (p *PodSubscription) Reconcile(object runtime.Object, event watch.EventType) {
 
 	pod := object.(*v1.Pod)
@@ -24,28 +46,12 @@ func (p *PodSubscription) Reconcile(object runtime.Object, event watch.EventType
 
 	switch event {
 	case watch.Added:
-		if _, ok := pod.Annotations["type"]; !ok {
-			updatedPod := pod.DeepCopy()
-			if updatedPod.Annotations == nil {
-				updatedPod.Annotations = make(map[string]string)
-			}
-			updatedPod.Annotations["type"] = "sre"
-			// Update the pod
-			_, err := p.ClientSet.CoreV1().Pods(pod.Namespace).Update(p.Ctx, updatedPod, metav1.UpdateOptions{})
-			if err != nil {
-				klog.Error(err)
-			}
-		}
-
+		// Fetch the required PlatformConfig annotations
+		p.applyConfigMapChanges(pod, event)
 	case watch.Deleted:
 	case watch.Modified:
-
-		if pod.Annotations["type"] == "sre" {
-			klog.Info("This could be some custom behaviour beyond just a CRUD")
-		}
-
+		p.applyConfigMapChanges(pod, event)
 	}
-
 }
 
 func (p *PodSubscription) Subscribe() (watch.Interface, error) {
