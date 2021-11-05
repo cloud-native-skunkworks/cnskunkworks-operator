@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "cnskunkworks-operator.fullname" . }}
+  labels:
+    {{- include "cnskunkworks-operator.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    - port: 8080
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "cnskunkworks-operator.selectorLabels" . | nindent 4 }}

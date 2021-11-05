@@ -24,16 +24,20 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/cloud-native-skunkworks/cnskunkworks-operator/pkg/runtime"
-	"github.com/cloud-native-skunkworks/cnskunkworks-operator/pkg/subscription"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
-	"log"
+
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/cloud-native-skunkworks/cnskunkworks-operator/pkg/runtime"
+	"github.com/cloud-native-skunkworks/cnskunkworks-operator/pkg/subscription"
+	"github.com/opentracing/opentracing-go"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
+	"github.com/uber/jaeger-client-go"
+	"github.com/uber/jaeger-client-go/config"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -46,26 +50,50 @@ var (
 
 func main() {
 
-	klog.InitFlags(nil)
 	flag.Parse()
-
+	// Metrics
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())
 		log.Fatal(http.ListenAndServe(*addr, nil))
 	}()
-
-	klog.Info("Got watcher client...")
-
-	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
+	// Tracing
+	cfg := config.Configuration{
+		Sampler: &config.SamplerConfig{
+			Type:  "const",
+			Param: 1,
+		},
+		Reporter: &config.ReporterConfig{
+			LogSpans:            true,
+			BufferFlushInterval: 1 * time.Second,
+		},
+	}
+	tracer, closer, err := cfg.New(
+		"cnskunkworks_operator",
+		config.Logger(jaeger.StdLogger),
+	)
 	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
+		log.Fatalf("%s", err.Error())
 	}
 
-	klog.Info("Built config from flags...")
+	opentracing.SetGlobalTracer(tracer)
+	defer closer.Close()
+	// Logs
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetLevel(log.DebugLevel)
 
-	defaultKubernetesClientSet, err := kubernetes.NewForConfig(cfg)
+	// Run ....
+	log.Info("Got watcher client...")
+
+	kubeCfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		klog.Fatalf("Error building watcher clientset: %s", err.Error())
+		log.Fatalf("Error building kubeconfig: %s", err.Error())
+	}
+
+	log.Info("Built config from flags...")
+
+	defaultKubernetesClientSet, err := kubernetes.NewForConfig(kubeCfg)
+	if err != nil {
+		log.Fatalf("Error building watcher clientset: %s", err.Error())
 	}
 
 	// Context
@@ -87,7 +115,7 @@ func main() {
 		configMapSubscription,
 		podSubscription,
 	}); err != nil {
-		klog.Fatalf(err.Error())
+		log.Fatalf(err.Error())
 	}
 }
 

@@ -3,7 +3,13 @@ module github.com/cloud-native-skunkworks/cnskunkworks-operator
 go 1.16
 
 require (
+	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/prometheus/client_golang v1.11.0
+	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/siruspen/logrus v1.7.1 // indirect
+	github.com/uber/jaeger-client-go v2.29.1+incompatible // indirect
+	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/api v0.21.1 // indirect
 	k8s.io/apimachinery v0.21.1 // indirect

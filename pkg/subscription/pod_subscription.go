@@ -2,12 +2,15 @@ package subscription
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/opentracing/opentracing-go"
+	log "github.com/siruspen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
 )
 
 type PodSubscription struct {
@@ -34,22 +37,33 @@ func (p *PodSubscription) applyConfigMapChanges(pod *v1.Pod, event watch.EventTy
 			// Update the pod
 			_, err := p.ClientSet.CoreV1().Pods(pod.Namespace).Update(p.Ctx, updatedPod, metav1.UpdateOptions{})
 			if err != nil {
-				klog.Error(err)
+				log.Error(err)
 			}
 		}
 	}
 }
 func (p *PodSubscription) Reconcile(object runtime.Object, event watch.EventType) {
+	rootSpan := opentracing.GlobalTracer().StartSpan("podSubscriptionReoncile")
+	defer rootSpan.Finish()
 
 	pod := object.(*v1.Pod)
-	klog.Infof("PodSubscription event type %s for %s", event, pod.Name)
-
+	log.WithFields(log.Fields{
+		"namespace": pod.Namespace,
+	}).Info(fmt.Sprintf("PodSubscription event type %s for %s", event, pod.Name))
 	switch event {
 	case watch.Added:
+		watchEventAdd := opentracing.GlobalTracer().StartSpan(
+			"watchEventAdd", opentracing.ChildOf(rootSpan.Context()),
+		)
+		defer watchEventAdd.Finish()
 		// Fetch the required PlatformConfig annotations
 		p.applyConfigMapChanges(pod, event)
 	case watch.Deleted:
 	case watch.Modified:
+		watchEventModified := opentracing.GlobalTracer().StartSpan(
+			"watchEventModified", opentracing.ChildOf(rootSpan.Context()),
+		)
+		defer watchEventModified.Finish()
 		p.applyConfigMapChanges(pod, event)
 	}
 }
@@ -60,7 +74,7 @@ func (p *PodSubscription) Subscribe() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.Info("Started watch stream for PodSubscription")
+	log.Info("Started watch stream for PodSubscription")
 	return p.watcherInterface, nil
 }
 
