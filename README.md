@@ -1,5 +1,7 @@
 <img src="images/logo.png" width="300">
 
+[![ohmyyaml](./images/operator.png)](https://youtu.be/08O9eLJGQRM "Operators")
+
 # cnskunkworks-operator
 
 This repository provides a "beyond-the-basics" approach to implementing an operator without Operator SDK/Kubebuilder.
